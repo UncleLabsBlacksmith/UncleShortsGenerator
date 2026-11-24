@@ -32,6 +32,7 @@ from pathlib import Path
 import runpy
 import sys
 app = Path(__file__).resolve().parent
+sys.dont_write_bytecode = True
 sys.path.insert(0, str(app))
 os.environ['SHORTS_STUDIO_INSTALLED'] = '1'
 os.environ['PATH'] = str(app.parent / 'bin') + os.pathsep + os.environ.get('PATH', '')
@@ -221,7 +222,7 @@ def main(argv=None):
     for name in SOURCES:
         shutil.copy2(ROOT / name, app / name)
     (app / 'launch_studio.py').write_text(BOOTSTRAP, encoding='utf-8')
-    for name in ('README.md', 'USER_GUIDE.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md'):
+    for name in ('README.md', 'USER_GUIDE.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'PUBLISHING.md'):
         shutil.copy2(ROOT / name, app / name)
     shutil.copytree(ROOT / 'assets', app / 'assets')
     print('Copying local Python runtime and dependencies...', flush=True)
@@ -232,6 +233,15 @@ def main(argv=None):
         shutil.copy2(path, binaries / path.name)
     licenses = stage / 'licenses'
     licenses.mkdir()
+    # Preserve the provider's full license and build/source information as well
+    # as ffmpeg -L. The application's MIT license does not replace these files.
+    provider = media[0].parent.parent
+    license_file = provider / 'LICENSE'
+    if not license_file.is_file():
+        raise RuntimeError('FFmpeg provider LICENSE is required beside its bin folder.')
+    shutil.copy2(license_file, licenses / 'FFmpeg-LICENSE.txt')
+    if (provider / 'README.txt').is_file():
+        shutil.copy2(provider / 'README.txt', licenses / 'FFmpeg-BUILD-README.txt')
     result = subprocess.run([str(media[0]), '-L'], capture_output=True, text=True, check=True,
                             creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
     (licenses / 'FFmpeg.txt').write_text(result.stdout + '\n' + result.stderr + '\nhttps://ffmpeg.org/legal.html\nhttps://www.gyan.dev/ffmpeg/builds/\n', encoding='utf-8')
